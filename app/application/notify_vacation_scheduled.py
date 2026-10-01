@@ -3,8 +3,10 @@ from datetime import datetime, timezone
 from uuid import uuid4
 
 from app.domain.entities import Notification
+from app.domain.email_sender import EmailSender
 from app.domain.repositories import DedupNotificationRepository, EmployeeDirectoryRepository
 from app.infrastructure.messaging.envelope import EventEnvelope
+from app.infrastructure.email.notification_template import render_notification_email
 
 
 async def handle_vacation_scheduled(
@@ -12,6 +14,7 @@ async def handle_vacation_scheduled(
     repository: DedupNotificationRepository,
     directory: EmployeeDirectoryRepository,
     logger: logging.Logger,
+    email_sender: EmailSender | None = None,
 ) -> None:
     data = envelope.data
     empleado_id = data["empleadoId"]
@@ -51,6 +54,14 @@ async def handle_vacation_scheduled(
             extra={"fields": {"eventId": envelope.id, "eventType": envelope.type}},
         )
         return
+
+    if email_sender is not None:
+        await email_sender.send(
+            email,
+            "Confirmación de vacaciones RHM",
+            mensaje,
+            render_notification_email("VACACIONES", nombre_completo, mensaje),
+        )
 
     logger.info(
         f'[NOTIFICACIÓN] Tipo: VACACIONES | Para: {email} | Mensaje: "{mensaje}"',

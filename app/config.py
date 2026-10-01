@@ -24,6 +24,10 @@ class Settings:
     broker_queue: str
     broker_connect_max_attempts: int
     broker_connect_retry_delay_ms: int
+    smtp_host: str
+    smtp_port: int
+    smtp_from: str
+    smtp_use_tls: bool
 
     @property
     def database_dsn(self) -> str:
@@ -62,4 +66,8 @@ def load_settings() -> Settings:
         broker_queue=os.environ.get("BROKER_QUEUE", "notificaciones.queue"),
         broker_connect_max_attempts=int(os.environ.get("BROKER_CONNECT_MAX_ATTEMPTS", "5")),
         broker_connect_retry_delay_ms=int(os.environ.get("BROKER_CONNECT_RETRY_DELAY_MS", "1000")),
+        smtp_host=os.environ.get("SMTP_HOST", "mailhog"),
+        smtp_port=int(os.environ.get("SMTP_PORT", "1025")),
+        smtp_from=os.environ.get("SMTP_FROM", "notificaciones@rhm.local"),
+        smtp_use_tls=os.environ.get("SMTP_USE_TLS", "false").lower() == "true",
     )
