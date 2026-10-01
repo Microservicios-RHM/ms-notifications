@@ -9,6 +9,7 @@ from app.application.notify_vacation_scheduled import handle_vacation_scheduled
 from app.config import load_settings
 from app.infrastructure.http.health_routes import router as health_router
 from app.infrastructure.http.notification_routes import create_notification_router
+from app.infrastructure.email.smtp_email_sender import SmtpEmailSender
 from app.infrastructure.messaging.consumer import RabbitMqConsumer
 from app.infrastructure.persistence.database import create_pool
 from app.infrastructure.persistence.employee_directory_repository import (
@@ -43,6 +44,13 @@ async def lifespan(app: FastAPI):
 
     repository = PostgresNotificationRepository(pool)
     directory = PostgresEmployeeDirectoryRepository(pool)
+    email_sender = SmtpEmailSender(
+        settings.smtp_host,
+        settings.smtp_port,
+        settings.smtp_from,
+        settings.smtp_use_tls,
+        logger,
+    )
 
     app.include_router(
         create_notification_router(
@@ -61,15 +69,15 @@ async def lifespan(app: FastAPI):
     )
     consumer.on(
         "empleado.creado",
-        lambda envelope: handle_employee_created(envelope, repository, directory, logger),
+        lambda envelope: handle_employee_created(envelope, repository, directory, logger, email_sender),
     )
     consumer.on(
         "empleado.retirado",
-        lambda envelope: handle_employee_retired(envelope, repository, logger),
+        lambda envelope: handle_employee_retired(envelope, repository, logger, email_sender),
     )
     consumer.on(
         "vacaciones.programadas",
-        lambda envelope: handle_vacation_scheduled(envelope, repository, directory, logger),
+        lambda envelope: handle_vacation_scheduled(envelope, repository, directory, logger, email_sender),
     )
 
     logger.info(

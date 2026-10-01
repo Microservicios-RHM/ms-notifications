@@ -175,9 +175,20 @@ la API de administración de RabbitMQ (equivalente a repetirlo desde la UI). El 
 entrega mostró `"msg": "Duplicate event ignored"` y la tabla `notificaciones` mantuvo una sola fila
 para ese empleado.
 
-## Simulación de notificaciones
+## Entrega SMTP local (bonus)
 
-No se envía correo real. Se registra un log estructurado:
+Además del historial y el log estructurado, el servicio entrega un correo SMTP por cada notificación
+nueva. El adaptador `SmtpEmailSender` usa variables de entorno (`SMTP_HOST`, `SMTP_PORT`,
+`SMTP_FROM`, `SMTP_USE_TLS`) y MailHog captura los mensajes en local; no se envían correos a
+Internet. Si SMTP falla, la notificación ya persistida se conserva y el error queda en logs.
+
+Con el Compose central levantado, abre la bandeja de MailHog en:
+
+```text
+http://localhost:8025
+```
+
+MailHog recibe SMTP internamente en `mailhog:1025`. La interfaz está publicada solo en localhost.
 
 ```json
 {"level": "info", "time": "...", "service": "ms-notifications", "msg": "[NOTIFICACIÓN] Tipo: BIENVENIDA | Para: carlos.vega@empresa.com | Mensaje: \"Bienvenido Carlos Vega, tu cuenta ha sido creada exitosamente.\"", "eventId": "...", "empleadoId": "E903", "notificationId": "..."}

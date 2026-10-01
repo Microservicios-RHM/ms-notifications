@@ -3,8 +3,10 @@ from datetime import datetime, timezone
 from uuid import uuid4
 
 from app.domain.entities import Notification
+from app.domain.email_sender import EmailSender
 from app.domain.repositories import DedupNotificationRepository, EmployeeDirectoryRepository
 from app.infrastructure.messaging.envelope import EventEnvelope
+from app.infrastructure.email.notification_template import render_notification_email
 
 
 async def handle_employee_created(
@@ -12,6 +14,7 @@ async def handle_employee_created(
     repository: DedupNotificationRepository,
     directory: EmployeeDirectoryRepository,
     logger: logging.Logger,
+    email_sender: EmailSender | None = None,
 ) -> None:
     data = envelope.data
     nombre = data.get("nombre", "")
@@ -40,6 +43,14 @@ async def handle_employee_created(
     # (ese evento no trae nombre/email). Solo en la primera vez que se procesa el evento: si fuera
     # un duplicado ya se hizo arriba y el directorio ya quedó correcto desde entonces.
     await directory.upsert(data["id"], nombre, apellido, destinatario)
+
+    if email_sender is not None:
+        await email_sender.send(
+            destinatario,
+            "Bienvenido a RHM",
+            mensaje,
+            render_notification_email("BIENVENIDA", f"{nombre} {apellido}".strip(), mensaje),
+        )
 
     logger.info(
         f'[NOTIFICACIÓN] Tipo: BIENVENIDA | Para: {destinatario} | Mensaje: "{mensaje}"',
