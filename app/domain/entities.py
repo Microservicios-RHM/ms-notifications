@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from typing import Literal
 
-NotificationType = Literal["BIENVENIDA", "DESVINCULACION", "VACACIONES"]
+NotificationType = Literal["BIENVENIDA", "DESVINCULACION", "VACACIONES", "SEGURIDAD", "CUENTA"]
 
 
 @dataclass(frozen=True)
