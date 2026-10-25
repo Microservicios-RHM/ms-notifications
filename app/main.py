@@ -1,11 +1,14 @@
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from fastapi.openapi.utils import get_openapi
 
 from app.application.list_notifications import ListNotifications, ListNotificationsByEmployee
 from app.application.notify_employee_created import handle_employee_created
 from app.application.notify_employee_retired import handle_employee_retired
+from app.application.notify_security_token import handle_security_token
 from app.application.notify_vacation_scheduled import handle_vacation_scheduled
+from app.application.notify_account_status import handle_account_status
 from app.config import load_settings
 from app.infrastructure.http.health_routes import router as health_router
 from app.infrastructure.http.notification_routes import create_notification_router
@@ -79,6 +82,16 @@ async def lifespan(app: FastAPI):
         "vacaciones.programadas",
         lambda envelope: handle_vacation_scheduled(envelope, repository, directory, logger, email_sender),
     )
+    for evento_de_seguridad in ("usuario.creado", "usuario.recuperacion"):
+        consumer.on(
+            evento_de_seguridad,
+            lambda envelope: handle_security_token(envelope, repository, logger, email_sender),
+        )
+    for evento_de_cuenta in ("cuenta.activada", "cuenta.desactivada"):
+        consumer.on(
+            evento_de_cuenta,
+            lambda envelope: handle_account_status(envelope, repository, logger, email_sender),
+        )
 
     logger.info(
         "Connecting to RabbitMQ",
@@ -107,3 +120,35 @@ app = FastAPI(
     openapi_url="/notificaciones/openapi.json",
 )
 app.include_router(health_router)
+
+
+# FastAPI construye el documento OpenAPI por su cuenta a partir de las rutas, así que el esquema de
+# seguridad se inyecta sobre el resultado. Es solo documentación: quien valida el token es el API
+# Gateway, no este servicio. Sin esto el botón Authorize de Swagger no existe y, como desde el
+# Reto 5 todo exige token, cada "Try it out" respondería 401 sin forma de autenticarse.
+def _openapi_con_bearer() -> dict:
+    if app.openapi_schema:
+        return app.openapi_schema
+
+    schema = get_openapi(
+        title=app.title,
+        version=app.version,
+        routes=app.routes,
+    )
+    schema.setdefault("components", {})["securitySchemes"] = {
+        "BearerAuth": {
+            "type": "http",
+            "scheme": "bearer",
+            "bearerFormat": "JWT",
+            "description": (
+                "Token obtenido en POST /auth/login a través del API Gateway. "
+                "Pulse Authorize y pegue el valor de accessToken."
+            ),
+        }
+    }
+    schema["security"] = [{"BearerAuth": []}]
+    app.openapi_schema = schema
+    return schema
+
+
+app.openapi = _openapi_con_bearer

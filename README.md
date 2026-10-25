@@ -20,6 +20,12 @@ Forma parte del ecosistema RHM (Reto 4 — comunicación asincrónica). El contr
 - ✅ Registrado en el API Gateway: `http://localhost:8080/notificaciones`, **incluida la
   documentación interactiva** en `http://localhost:8080/notificaciones/docs`.
 
+Añadido en el **Reto 5**, los cuatro eventos que emite `auth-service`:
+
+- ✅ Consume `usuario.creado` y `usuario.recuperacion` → notificación `SEGURIDAD` con el enlace
+  para establecer o restablecer la contraseña.
+- ✅ Consume `cuenta.activada` y `cuenta.desactivada` → notificación `CUENTA`.
+
 ## Requisitos
 
 - Python 3.13 (el `Dockerfile` usa `python:3.13-slim`; se desarrolló y probó también con 3.14).
@@ -175,6 +181,45 @@ la API de administración de RabbitMQ (equivalente a repetirlo desde la UI). El 
 entrega mostró `"msg": "Duplicate event ignored"` y la tabla `notificaciones` mantuvo una sola fila
 para ese empleado.
 
+### Los eventos de cuenta (Reto 5)
+
+Dos manejadores nuevos atienden los cuatro eventos que publica `auth-service`.
+
+**`usuario.creado` y `usuario.recuperacion` → tipo `SEGURIDAD`.** Ambos traen el correo y el token,
+así que no hace falta consultar el directorio local: a diferencia de `vacaciones.programadas`,
+`auth-service` conoce el correo de primera mano, porque es la credencial de login.
+
+Aquí hay un detalle del enunciado que es fácil pasar por alto: el correo de bienvenida del
+onboarding se dispara con `usuario.creado`, **no** con `empleado.creado`. Es `usuario.creado` el
+que trae el token de activación, y sin token el mensaje sería inútil — le diría al empleado que
+active su cuenta sin darle cómo.
+
+**`cuenta.activada` y `cuenta.desactivada` → tipo `CUENTA`.** El texto se elige por el **motivo**
+del evento, no por su tipo. Una desactivación por vacaciones y una por retiro llegan como el mismo
+evento, pero para quien lo recibe no significan lo mismo: una anuncia un regreso y la otra una
+desvinculación.
+
+| Evento | `motivo` | Mensaje |
+|---|---|---|
+| `cuenta.desactivada` | `VACACIONES` | Su cuenta fue desactivada temporalmente mientras disfruta de sus vacaciones. |
+| `cuenta.desactivada` | `RETIRO` | Su cuenta fue desactivada de forma permanente tras su desvinculación. |
+| `cuenta.activada` | `ACTIVACION_INICIAL` | Su cuenta quedó activada y ya puede iniciar sesión. |
+| `cuenta.activada` | `FIN_VACACIONES` | Bienvenido de regreso. Su cuenta fue reactivada y ya puede iniciar sesión. |
+
+Un motivo desconocido se registra como advertencia y no genera notificación, en vez de inventar un
+texto genérico.
+
+### La migración que hizo falta
+
+La tabla `notificaciones` tenía una restricción `CHECK` que solo admitía `BIENVENIDA`,
+`DESVINCULACION` y `VACACIONES`. Para admitir `SEGURIDAD` y `CUENTA` había que modificarla.
+
+No se editó la migración 1: no habría vuelto a ejecutarse, porque el volumen ya tiene datos. Se
+agregó una **migración 3** que altera la restricción sin perder nada.
+
+Es exactamente el escenario que el README de infraestructura describe como la limitación de los
+scripts de inicialización frente a las migraciones versionadas, ocurriendo en la práctica.
+
 ## Entrega SMTP local (bonus)
 
 Además del historial y el log estructurado, el servicio entrega un correo SMTP por cada notificación
@@ -197,6 +242,17 @@ MailHog recibe SMTP internamente en `mailhog:1025`. La interfaz está publicada 
 ```bash
 docker compose logs -f notificaciones-service
 ```
+
+### Autenticación en Swagger (Reto 5)
+
+Desde el Reto 5 todas las peticiones exigen un token, que valida el API Gateway. El documento
+OpenAPI declara el esquema de seguridad `BearerAuth`, así que la página de Swagger muestra el
+botón **Authorize**: se pega ahí el `accessToken` que devuelve `POST /auth/login` y el token viaja
+en cada petición de prueba.
+
+Es solo documentación. Este servicio no verifica la firma — de eso se encarga el Gateway, una sola
+vez para todo el ecosistema. Sin esta declaración el botón no existiría y cualquier "Try it out"
+respondería `401` sin forma de autenticarse.
 
 ## Persistencia
 

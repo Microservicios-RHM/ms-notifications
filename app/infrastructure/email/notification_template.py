@@ -5,6 +5,8 @@ _PALETTES = {
     "BIENVENIDA": ("#146C94", "#E8F5FA", "¡Te damos la bienvenida!"),
     "DESVINCULACION": ("#6B7280", "#F3F4F6", "Información sobre tu cuenta"),
     "VACACIONES": ("#0F766E", "#E6FFFB", "Vacaciones confirmadas"),
+    "SEGURIDAD": ("#B45309", "#FEF3C7", "Acceso a tu cuenta"),
+    "CUENTA": ("#4338CA", "#EEF2FF", "Estado de tu cuenta"),
 }
 
 

@@ -38,6 +38,16 @@ MIGRATIONS: list[tuple[int, str, str]] = [
         );
         """,
     ),
+    (
+        3,
+        "extend_notification_types",
+        """
+        ALTER TABLE notificaciones
+            DROP CONSTRAINT notificaciones_tipo_check,
+            ADD CONSTRAINT notificaciones_tipo_check
+                CHECK (tipo IN ('BIENVENIDA', 'DESVINCULACION', 'VACACIONES', 'SEGURIDAD', 'CUENTA'));
+        """,
+    ),
 ]
 
 
