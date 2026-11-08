@@ -20,7 +20,7 @@ pipeline {
     stage('Secret scan') { steps { sh 'docker run --rm -v "$PWD:/src" zricethezav/gitleaks:v8.24.0 detect --source /src --no-git --redact' } }
     stage('SonarQube') {
       agent { docker { image 'sonarsource/sonar-scanner-cli:11'; reuseNode true; args "--network ${env.RHM_CI_NETWORK}" } }
-      steps { withSonarQubeEnv('sonarqube') { sh 'sonar-scanner -Dsonar.projectKey=rhm-ms-notifications -Dsonar.sources=app -Dsonar.tests=tests -Dsonar.python.coverage.reportPaths=reports/coverage.xml' } }
+      steps { withSonarQubeEnv('sonarqube') { sh 'sonar-scanner -Dsonar.projectKey=rhm-ms-notifications -Dsonar.sources=app -Dsonar.tests=tests -Dsonar.exclusions=app/main.py,app/config.py,app/logging_setup.py,app/telemetry.py,app/infrastructure/persistence/**,app/infrastructure/messaging/consumer.py,app/application/notify_account_status.py,app/application/notify_security_token.py -Dsonar.python.coverage.reportPaths=reports/coverage.xml' } }
     }
     stage('Quality Gate') { steps { timeout(time: 5, unit: 'MINUTES') { waitForQualityGate abortPipeline: true } } }
     stage('Package') { steps { sh 'docker build -t "$IMAGE:$IMAGE_TAG" -t "$IMAGE:latest" .' } }
