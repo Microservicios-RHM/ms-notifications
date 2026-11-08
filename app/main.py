@@ -99,11 +99,14 @@ async def lifespan(app: FastAPI):
         extra={"fields": {"exchange": settings.broker_exchange, "queue": settings.broker_queue}},
     )
     await consumer.start()
+    app.state.database_pool = pool
+    app.state.broker_connected = consumer._connection is not None
     logger.info("Notifications service started", extra={"fields": {"port": settings.port}})
 
     yield
 
     await consumer.close()
+    app.state.broker_connected = False
     await pool.close()
     logger.info("Notifications service stopped")
 

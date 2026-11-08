@@ -5,6 +5,8 @@ from collections.abc import Awaitable, Callable
 
 import aio_pika
 from aio_pika.abc import AbstractIncomingMessage, AbstractRobustConnection
+from opentelemetry import propagate, trace
+from opentelemetry.trace import SpanKind
 
 from app.infrastructure.messaging.envelope import EventEnvelope
 
@@ -91,7 +93,22 @@ class RabbitMqConsumer:
                 )
                 return
             try:
-                await handler(envelope)
+                carrier = {
+                    str(key): value.decode() if isinstance(value, bytes) else str(value)
+                    for key, value in (message.headers or {}).items()
+                }
+                parent_context = propagate.extract(carrier=carrier)
+                with trace.get_tracer("notificaciones-service").start_as_current_span(
+                    f"consume {routing_key}",
+                    context=parent_context,
+                    kind=SpanKind.CONSUMER,
+                    attributes={
+                        "messaging.system": "rabbitmq",
+                        "messaging.destination.name": self._exchange_name,
+                        "messaging.operation.name": "process",
+                    },
+                ):
+                    await handler(envelope)
             except Exception as error:  # noqa: BLE001
                 # Cualquier fallo del handler (p. ej. un dato inválido que la base de datos
                 # rechaza) se registra limpio y se descarta el mensaje (no se reintenta) — igual
