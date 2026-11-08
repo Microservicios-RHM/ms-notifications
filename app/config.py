@@ -7,6 +7,13 @@ from dotenv import load_dotenv
 _REQUIRED_VARS = ("DB_HOST", "DB_NAME", "DB_USER", "DB_PASSWORD", "BROKER_URL")
 
 
+def _load_file_backed_values() -> None:
+    for name in ("DB_PASSWORD", "BROKER_URL"):
+        file_path = os.getenv(f"{name}_FILE")
+        if not os.getenv(name) and file_path:
+            os.environ[name] = Path(file_path).read_text(encoding="utf-8").strip()
+
+
 @dataclass(frozen=True)
 class Settings:
     port: int
@@ -41,6 +48,8 @@ def load_settings() -> Settings:
     env_path = Path.cwd() / ".env"
     if env_path.exists():
         load_dotenv(env_path)
+
+    _load_file_backed_values()
 
     missing = [name for name in _REQUIRED_VARS if not os.environ.get(name)]
     if missing:
