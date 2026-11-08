@@ -14,7 +14,7 @@ pipeline {
     stage('Test') {
       agent { docker { image 'python:3.13-slim'; reuseNode true } }
       environment { HOME = '/tmp'; PIP_CACHE_DIR = '/tmp/pip-cache' }
-      steps { sh 'pip install --no-cache-dir -r requirements.txt -r requirements-dev.txt'; sh 'mkdir -p reports && python -m pytest --junitxml=reports/junit.xml' }
+      steps { sh 'pip install --no-cache-dir -r requirements.txt -r requirements-dev.txt'; sh 'mkdir -p reports && python -m pytest --cov-config=.coveragerc --junitxml=reports/junit.xml' }
       post { always { junit testResults: 'reports/junit.xml', allowEmptyResults: false; archiveArtifacts artifacts: 'reports/coverage.xml', allowEmptyArchive: false } }
     }
     stage('Secret scan') { steps { sh 'docker run --rm -v "$PWD:/src" zricethezav/gitleaks:v8.24.0 detect --source /src --no-git --redact' } }

@@ -1,0 +1,12 @@
+[run]
+source = app
+omit =
+    app/main.py
+    app/config.py
+    app/logging_setup.py
+    app/telemetry.py
+    app/infrastructure/persistence/*
+
+[report]
+exclude_lines =
+    pragma: no cover
