@@ -8,10 +8,12 @@ pipeline {
     stage('Checkout') { steps { checkout scm; script { env.IMAGE_TAG = "${env.BUILD_NUMBER}-${sh(script: 'git rev-parse --short=7 HEAD', returnStdout: true).trim()}" } } }
     stage('Build') {
       agent { docker { image 'python:3.13-slim'; reuseNode true } }
+      environment { HOME = '/tmp'; PIP_CACHE_DIR = '/tmp/pip-cache' }
       steps { sh 'pip install --no-cache-dir -r requirements.txt'; sh 'python -m compileall -q app' }
     }
     stage('Test') {
       agent { docker { image 'python:3.13-slim'; reuseNode true } }
+      environment { HOME = '/tmp'; PIP_CACHE_DIR = '/tmp/pip-cache' }
       steps { sh 'pip install --no-cache-dir -r requirements.txt -r requirements-dev.txt'; sh 'mkdir -p reports && python -m pytest --junitxml=reports/junit.xml' }
       post { always { junit testResults: 'reports/junit.xml', allowEmptyResults: false; archiveArtifacts artifacts: 'reports/coverage.xml', allowEmptyArchive: false } }
     }
