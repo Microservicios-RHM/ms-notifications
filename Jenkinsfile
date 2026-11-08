@@ -5,7 +5,11 @@ pipeline {
   environment { SERVICE = 'ms-notifications'; IMAGE = 'rhm/ms-notifications' }
   stages {
     stage('Checkout') { steps { checkout scm; script { env.IMAGE_TAG = "${env.BUILD_NUMBER}-${sh(script: 'git rev-parse --short=7 HEAD', returnStdout: true).trim()}" } } }
-    stage('Build and test') {
+    stage('Build') {
+      agent { docker { image 'python:3.13-slim'; reuseNode true } }
+      steps { sh 'pip install --no-cache-dir -r requirements.txt'; sh 'python -m compileall -q app' }
+    }
+    stage('Test') {
       agent { docker { image 'python:3.13-slim'; reuseNode true } }
       steps { sh 'pip install --no-cache-dir -r requirements.txt -r requirements-dev.txt'; sh 'python -m pytest' }
     }
