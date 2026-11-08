@@ -21,6 +21,7 @@ from app.infrastructure.persistence.employee_directory_repository import (
 from app.infrastructure.persistence.migrations import run_migrations
 from app.infrastructure.persistence.notification_repository import PostgresNotificationRepository
 from app.logging_setup import configure_logging, silence_health_check_access_logs
+from app.telemetry import configure_telemetry
 
 settings = load_settings()
 logger = configure_logging(settings.log_level)
@@ -120,6 +121,7 @@ app = FastAPI(
     openapi_url="/notificaciones/openapi.json",
 )
 app.include_router(health_router)
+configure_telemetry(app)
 
 
 # FastAPI construye el documento OpenAPI por su cuenta a partir de las rutas, así que el esquema de
