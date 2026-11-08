@@ -95,7 +95,7 @@ class RabbitMqConsumer:
             try:
                 carrier = {
                     str(key): value.decode() if isinstance(value, bytes) else str(value)
-                    for key, value in (message.headers or {}).items()
+                    for key, value in (getattr(message, "headers", None) or {}).items()
                 }
                 parent_context = propagate.extract(carrier=carrier)
                 with trace.get_tracer("notificaciones-service").start_as_current_span(
