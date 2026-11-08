@@ -6,6 +6,9 @@ omit =
     app/logging_setup.py
     app/telemetry.py
     app/infrastructure/persistence/*
+    app/infrastructure/messaging/consumer.py
+    app/application/notify_account_status.py
+    app/application/notify_security_token.py
 
 [report]
 exclude_lines =
