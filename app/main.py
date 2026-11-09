@@ -21,6 +21,8 @@ from app.infrastructure.persistence.employee_directory_repository import (
 from app.infrastructure.persistence.migrations import run_migrations
 from app.infrastructure.persistence.notification_repository import PostgresNotificationRepository
 from app.logging_setup import configure_logging, silence_health_check_access_logs
+from app.telemetry import configure_telemetry
+from app.observability import MetricsMiddleware
 
 settings = load_settings()
 logger = configure_logging(settings.log_level)
@@ -98,11 +100,14 @@ async def lifespan(app: FastAPI):
         extra={"fields": {"exchange": settings.broker_exchange, "queue": settings.broker_queue}},
     )
     await consumer.start()
+    app.state.database_pool = pool
+    app.state.broker_connected = consumer._connection is not None
     logger.info("Notifications service started", extra={"fields": {"port": settings.port}})
 
     yield
 
     await consumer.close()
+    app.state.broker_connected = False
     await pool.close()
     logger.info("Notifications service stopped")
 
@@ -120,6 +125,8 @@ app = FastAPI(
     openapi_url="/notificaciones/openapi.json",
 )
 app.include_router(health_router)
+app.add_middleware(MetricsMiddleware)
+configure_telemetry(app)
 
 
 # FastAPI construye el documento OpenAPI por su cuenta a partir de las rutas, así que el esquema de

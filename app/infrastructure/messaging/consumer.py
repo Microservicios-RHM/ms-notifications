@@ -5,8 +5,11 @@ from collections.abc import Awaitable, Callable
 
 import aio_pika
 from aio_pika.abc import AbstractIncomingMessage, AbstractRobustConnection
+from opentelemetry import propagate, trace
+from opentelemetry.trace import SpanKind
 
 from app.infrastructure.messaging.envelope import EventEnvelope
+from app.observability import observe_event
 
 Handler = Callable[[EventEnvelope], Awaitable[None]]
 
@@ -48,7 +51,12 @@ class RabbitMqConsumer:
                 last_error = error
                 self._logger.warning(
                     "RabbitMQ connection attempt failed",
-                    extra={"fields": {"attempt": attempt, "error": str(error)}},
+                    extra={
+                        "fields": {
+                            "attempt": attempt,
+                            "errorType": type(error).__name__,
+                        }
+                    },
                 )
                 if attempt < self._connect_max_attempts:
                     await asyncio.sleep((self._connect_retry_delay_ms / 1000) * attempt)
@@ -85,14 +93,32 @@ class RabbitMqConsumer:
             try:
                 envelope = EventEnvelope.parse(json.loads(message.body))
             except Exception:
+                observe_event(routing_key, "malformed")
                 self._logger.error(
                     "Malformed event received; discarded without reprocessing",
                     extra={"fields": {"routingKey": routing_key}},
                 )
                 return
             try:
-                await handler(envelope)
+                carrier = {
+                    str(key): value.decode() if isinstance(value, bytes) else str(value)
+                    for key, value in (getattr(message, "headers", None) or {}).items()
+                }
+                parent_context = propagate.extract(carrier=carrier)
+                with trace.get_tracer("notificaciones-service").start_as_current_span(
+                    f"consume {routing_key}",
+                    context=parent_context,
+                    kind=SpanKind.CONSUMER,
+                    attributes={
+                        "messaging.system": "rabbitmq",
+                        "messaging.destination.name": self._exchange_name,
+                        "messaging.operation.name": "process",
+                    },
+                ):
+                    await handler(envelope)
+                    observe_event(routing_key, "processed")
             except Exception as error:  # noqa: BLE001
+                observe_event(routing_key, "failed")
                 # Cualquier fallo del handler (p. ej. un dato inválido que la base de datos
                 # rechaza) se registra limpio y se descarta el mensaje (no se reintenta) — igual
                 # que ms-profiles/ms-vacation, en vez de dejar un traceback crudo sin contexto.
