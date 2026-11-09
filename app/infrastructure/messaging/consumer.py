@@ -5,10 +5,24 @@ from collections.abc import Awaitable, Callable
 
 import aio_pika
 from aio_pika.abc import AbstractIncomingMessage, AbstractRobustConnection
+from opentelemetry import propagate, trace
+from opentelemetry.trace import Span, SpanKind, Status, StatusCode
 
 from app.infrastructure.messaging.envelope import EventEnvelope
 
 Handler = Callable[[EventEnvelope], Awaitable[None]]
+
+tracer = trace.get_tracer("rhm-messaging")
+
+
+def _carrier(headers: dict | None) -> dict[str, str]:
+    carrier: dict[str, str] = {}
+    for key, value in (headers or {}).items():
+        if isinstance(value, bytes):
+            value = value.decode("utf-8", errors="replace")
+        if isinstance(value, str):
+            carrier[key] = value
+    return carrier
 
 
 class RabbitMqConsumer:
@@ -76,15 +90,38 @@ class RabbitMqConsumer:
             },
         )
 
+    def is_connected(self) -> bool:
+        """Reto 8: usado por GET /health (check messageBroker)."""
+        return self._connection is not None and not self._connection.is_closed
+
     async def _dispatch(self, message: AbstractIncomingMessage) -> None:
+        # Reto 8: la propagación por RabbitMQ es manual. El productor (empleados, auth, vacaciones)
+        # dejó su `traceparent` en las cabeceras del mensaje; se extrae para que este span
+        # CONSUMER, la consulta a PostgreSQL y el envío SMTP cuelguen de la misma traza en Zipkin.
+        routing_key = message.routing_key or ""
+        parent = propagate.extract(_carrier(getattr(message, "headers", None)))
+        with tracer.start_as_current_span(
+            f"{routing_key} process",
+            context=parent,
+            kind=SpanKind.CONSUMER,
+            attributes={
+                "messaging.system": "rabbitmq",
+                "messaging.operation.type": "process",
+                "messaging.destination.name": self._queue_name,
+                "messaging.rabbitmq.destination.routing_key": routing_key,
+            },
+        ) as span:
+            await self._process(message, routing_key, span)
+
+    async def _process(self, message: AbstractIncomingMessage, routing_key: str, span: Span) -> None:
         async with message.process(requeue=False):
-            routing_key = message.routing_key or ""
             handler = self._handlers.get(routing_key)
             if handler is None:
                 return
             try:
                 envelope = EventEnvelope.parse(json.loads(message.body))
             except Exception:
+                span.set_status(Status(StatusCode.ERROR, "malformed event"))
                 self._logger.error(
                     "Malformed event received; discarded without reprocessing",
                     extra={"fields": {"routingKey": routing_key}},
@@ -93,6 +130,8 @@ class RabbitMqConsumer:
             try:
                 await handler(envelope)
             except Exception as error:  # noqa: BLE001
+                span.record_exception(error)
+                span.set_status(Status(StatusCode.ERROR, str(error)))
                 # Cualquier fallo del handler (p. ej. un dato inválido que la base de datos
                 # rechaza) se registra limpio y se descarta el mensaje (no se reintenta) — igual
                 # que ms-profiles/ms-vacation, en vez de dejar un traceback crudo sin contexto.

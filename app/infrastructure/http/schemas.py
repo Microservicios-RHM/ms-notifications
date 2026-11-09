@@ -32,6 +32,6 @@ class NotificationListResponse(BaseModel):
 
 
 class HealthResponse(BaseModel):
-    success: bool = True
-    message: str = "Servicio disponible"
-    data: dict = Field(default_factory=lambda: {"status": "UP"})
+    status: str = Field(examples=["UP"])
+    service: str = Field(examples=["notificaciones-service"])
+    checks: dict[str, str] = Field(examples=[{"database": "UP", "messageBroker": "UP"}])

@@ -3,3 +3,10 @@ uvicorn[standard]==0.54.0
 asyncpg==0.31.0
 aio-pika==10.1.0
 python-dotenv==1.2.3
+# Reto 8: observabilidad (métricas Prometheus + trazas OpenTelemetry hacia Zipkin)
+prometheus-client==0.26.0
+opentelemetry-api==1.45.2
+opentelemetry-sdk==1.45.2
+opentelemetry-exporter-zipkin-json==1.45.2
+opentelemetry-instrumentation-fastapi==0.66b2
+opentelemetry-instrumentation-asyncpg==0.66b2
