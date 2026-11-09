@@ -15,7 +15,7 @@ def configure_telemetry(app) -> None:
 
     provider = TracerProvider(resource=Resource.create({"service.name": "notificaciones-service"}))
     exporter = OTLPSpanExporter(
-        endpoint=os.getenv("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT", "http://jaeger:4318/v1/traces")
+        endpoint=os.getenv("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT", "https://jaeger:4318/v1/traces")
     )
     provider.add_span_processor(BatchSpanProcessor(exporter))
     trace.set_tracer_provider(provider)

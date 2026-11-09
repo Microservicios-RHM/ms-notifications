@@ -1,13 +1,13 @@
 FROM python:3.13-slim AS builder
 WORKDIR /app
 COPY requirements.txt ./
-RUN pip wheel --no-cache-dir --wheel-dir /wheels -r requirements.txt
+RUN pip wheel --no-cache-dir --only-binary=:all: --wheel-dir /wheels -r requirements.txt
 
 FROM python:3.13-slim
 WORKDIR /app
 RUN groupadd --system app && useradd --system --gid app --no-create-home app
 COPY --from=builder /wheels /wheels
-RUN pip install --no-cache-dir /wheels/* && rm -rf /wheels
+RUN pip install --no-cache-dir --only-binary=:all: /wheels/* && rm -rf /wheels
 
 COPY app ./app
 COPY templates ./templates
