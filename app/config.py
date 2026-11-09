@@ -1,6 +1,7 @@
 import os
 from dataclasses import dataclass
 from pathlib import Path
+from urllib.parse import quote
 
 from dotenv import load_dotenv
 
@@ -39,7 +40,7 @@ class Settings:
     @property
     def database_dsn(self) -> str:
         return (
-            f"postgresql://{self.db_user}:{self.db_password}"
+            f"postgresql://{quote(self.db_user, safe='')}:{quote(self.db_password, safe='')}"
             f"@{self.db_host}:{self.db_port}/{self.db_name}"
         )
 

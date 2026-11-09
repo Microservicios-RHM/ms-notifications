@@ -50,7 +50,12 @@ class RabbitMqConsumer:
                 last_error = error
                 self._logger.warning(
                     "RabbitMQ connection attempt failed",
-                    extra={"fields": {"attempt": attempt, "error": str(error)}},
+                    extra={
+                        "fields": {
+                            "attempt": attempt,
+                            "errorType": type(error).__name__,
+                        }
+                    },
                 )
                 if attempt < self._connect_max_attempts:
                     await asyncio.sleep((self._connect_retry_delay_ms / 1000) * attempt)
