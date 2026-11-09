@@ -2,6 +2,7 @@ from fastapi import APIRouter, Request, Response
 from fastapi.responses import JSONResponse
 
 from app.infrastructure.http.schemas import HealthResponse
+from app.observability import render_metrics
 
 router = APIRouter()
 
@@ -9,11 +10,7 @@ router = APIRouter()
 @router.get("/metrics", include_in_schema=False)
 async def metrics() -> Response:
     return Response(
-        content=(
-            "# HELP rhm_notifications_service_info Static service identity metric\n"
-            "# TYPE rhm_notifications_service_info gauge\n"
-            'rhm_notifications_service_info{service="notificaciones-service"} 1\n'
-        ),
+        content=render_metrics(),
         media_type="text/plain; version=0.0.4; charset=utf-8",
     )
 

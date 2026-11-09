@@ -9,6 +9,7 @@ from opentelemetry import propagate, trace
 from opentelemetry.trace import SpanKind
 
 from app.infrastructure.messaging.envelope import EventEnvelope
+from app.observability import observe_event
 
 Handler = Callable[[EventEnvelope], Awaitable[None]]
 
@@ -92,6 +93,7 @@ class RabbitMqConsumer:
             try:
                 envelope = EventEnvelope.parse(json.loads(message.body))
             except Exception:
+                observe_event(routing_key, "malformed")
                 self._logger.error(
                     "Malformed event received; discarded without reprocessing",
                     extra={"fields": {"routingKey": routing_key}},
@@ -114,7 +116,9 @@ class RabbitMqConsumer:
                     },
                 ):
                     await handler(envelope)
+                    observe_event(routing_key, "processed")
             except Exception as error:  # noqa: BLE001
+                observe_event(routing_key, "failed")
                 # Cualquier fallo del handler (p. ej. un dato inválido que la base de datos
                 # rechaza) se registra limpio y se descarta el mensaje (no se reintenta) — igual
                 # que ms-profiles/ms-vacation, en vez de dejar un traceback crudo sin contexto.

@@ -2,6 +2,7 @@ import json
 import logging
 import sys
 from datetime import datetime, timezone
+from opentelemetry import trace
 
 SERVICE_NAME = "ms-notifications"
 
@@ -9,12 +10,17 @@ SERVICE_NAME = "ms-notifications"
 class JsonFormatter(logging.Formatter):
     def format(self, record: logging.LogRecord) -> str:
         payload = {
+            "timestamp": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
             "level": record.levelname.lower(),
-            "time": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
-            "service": SERVICE_NAME,
-            "msg": record.getMessage(),
+            "service": "notificaciones-service",
+            "message": record.getMessage(),
+            "context": getattr(record, "fields", {}),
+            "traceId": (
+                trace.get_current_span().get_span_context().trace_id.to_bytes(16, "big").hex()
+                if trace.get_current_span().get_span_context().is_valid
+                else None
+            ),
         }
-        payload.update(getattr(record, "fields", {}))
         if record.exc_info:
             payload["err"] = self.formatException(record.exc_info)
         return json.dumps(payload, ensure_ascii=False)

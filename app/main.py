@@ -22,6 +22,7 @@ from app.infrastructure.persistence.migrations import run_migrations
 from app.infrastructure.persistence.notification_repository import PostgresNotificationRepository
 from app.logging_setup import configure_logging, silence_health_check_access_logs
 from app.telemetry import configure_telemetry
+from app.observability import MetricsMiddleware
 
 settings = load_settings()
 logger = configure_logging(settings.log_level)
@@ -124,6 +125,7 @@ app = FastAPI(
     openapi_url="/notificaciones/openapi.json",
 )
 app.include_router(health_router)
+app.add_middleware(MetricsMiddleware)
 configure_telemetry(app)
 
 
