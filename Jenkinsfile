@@ -5,7 +5,7 @@ pipeline {
   triggers { pollSCM('H/5 * * * *') }
   environment { SERVICE = 'ms-notifications'; COMPOSE_SERVICE = 'notificaciones-service'; IMAGE = 'rhm/ms-notifications' }
   stages {
-    stage('Checkout') { steps { checkout scm; script { env.IMAGE_TAG = "${env.BUILD_NUMBER}-${sh(script: 'git rev-parse --short=7 HEAD', returnStdout: true).trim()}" } } }
+    stage('Checkout') { steps { deleteDir(); checkout scm; script { env.IMAGE_TAG = "${env.BUILD_NUMBER}-${sh(script: 'git rev-parse --short=7 HEAD', returnStdout: true).trim()}" } } }
     stage('Secret scan') { steps { sh 'docker run --rm --volumes-from "$HOSTNAME" zricethezav/gitleaks:v8.24.0 detect --source "$PWD" --no-git --redact' } }
     stage('Build') {
       agent { docker { image 'python:3.13-slim'; reuseNode true } }
