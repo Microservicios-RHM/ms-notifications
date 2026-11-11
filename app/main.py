@@ -21,6 +21,9 @@ from app.infrastructure.persistence.employee_directory_repository import (
 from app.infrastructure.persistence.migrations import run_migrations
 from app.infrastructure.persistence.notification_repository import PostgresNotificationRepository
 from app.logging_setup import configure_logging, silence_health_check_access_logs
+from app.observability.metrics import HttpMetrics, install_metrics
+from app.observability.tracing import configure_tracing, service_name
+from opentelemetry.instrumentation.utils import suppress_instrumentation
 
 settings = load_settings()
 logger = configure_logging(settings.log_level)
@@ -98,6 +101,17 @@ async def lifespan(app: FastAPI):
         extra={"fields": {"exchange": settings.broker_exchange, "queue": settings.broker_queue}},
     )
     await consumer.start()
+
+    async def database_ready() -> bool:
+        # Sin span: el healthcheck de Docker llega cada pocos segundos y su SELECT 1 llenaría
+        # Zipkin de trazas sueltas que no son negocio.
+        with suppress_instrumentation():
+            return await pool.fetchval("SELECT 1") == 1
+
+    async def broker_ready() -> bool:
+        return consumer.is_connected()
+
+    app.state.health_checks = {"database": database_ready, "messageBroker": broker_ready}
     logger.info("Notifications service started", extra={"fields": {"port": settings.port}})
 
     yield
@@ -120,6 +134,10 @@ app = FastAPI(
     openapi_url="/notificaciones/openapi.json",
 )
 app.include_router(health_router)
+# Reto 8: métricas Prometheus en /metrics y trazas OpenTelemetry hacia Zipkin.
+install_metrics(app, HttpMetrics(service_name()))
+if configure_tracing(app):
+    logger.info("OpenTelemetry tracing enabled", extra={"fields": {"exporter": "zipkin"}})
 
 
 # FastAPI construye el documento OpenAPI por su cuenta a partir de las rutas, así que el esquema de

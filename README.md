@@ -275,3 +275,16 @@ docker exec notificaciones-service python -c "import urllib.request;print(urllib
 
 `/health` responde el mismo envelope que el resto del ecosistema:
 `{"success": true, "message": "Servicio disponible", "data": {"status": "UP"}}`.
+
+## Observabilidad (Reto 8)
+
+Instrumentación de `notificaciones-service` para el stack de observabilidad del ecosistema (Prometheus,
+Loki, Zipkin y Grafana). Arquitectura, dashboard, alertas y pruebas de caos en el
+[README de infraestructura](https://github.com/Microservicios-RHM/rhm-database-infrastructure#observabilidad-y-monitoreo-reto-8).
+
+| Pilar | Implementación |
+|---|---|
+| Métricas | `prometheus_client` — `GET /metrics` ([app/observability/metrics.py](app/observability/metrics.py)). Métricas comunes a los 7 servicios: `http_requests_total{method,route,status}`, `http_request_duration_seconds{method,route,status}`, `process_cpu_seconds_total`, `process_resident_memory_bytes`. |
+| Health | `GET /health` verifica PostgreSQL (`SELECT 1`) y la conexión a RabbitMQ; 503 mientras el arranque no terminó. Formato `{"status":"UP","service":"notificaciones-service","checks":{...}}`, 200 si todo está UP y 503 si algo está DOWN. |
+| Trazas | `opentelemetry-sdk` + `instrumentation-fastapi`/`asyncpg` + `exporter-zipkin-json` ([app/observability/tracing.py](app/observability/tracing.py)). El consumidor extrae `traceparent` de las cabeceras del mensaje (span CONSUMER) y el envío SMTP tiene su propio span (`smtp send`). Exporta a `OTEL_EXPORTER_ZIPKIN_ENDPOINT` con propagación W3C Trace Context; sin esa variable el tracing queda desactivado. |
+| Logs | `logging` con `JsonFormatter`: `timestamp`, `level`, `service`, `traceId`, `message` + campos. |
